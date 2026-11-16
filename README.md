@@ -26,7 +26,7 @@ Lists the windows on the visible Desktops (minimized windows and windows of hidd
 |---|---|
 | Cmd+Tab | Open the panel and select the previous window. With the panel open, move to the next window. |
 | Cmd+Shift+Tab | Open the panel and select the last window. With the panel open, move to the previous window. |
-| Left / Right arrow (Cmd held) | Move to the previous / next window. |
+| Left / Right arrow (panel open) | Move to the previous / next window. |
 | Release Cmd | Switch to the selected window. |
 | Esc | Close the panel without a switch. |
 | Click on a tile | Switch to that window. |
@@ -42,6 +42,7 @@ Lists the windows on the visible Desktops (minimized windows and windows of hidd
 
 The app disables the native Cmd+Tab while it runs and enables it again at `Quit`.
 If the app stops abnormally, the native Cmd+Tab can stay disabled. Start the app again and select `Quit`.
+This works only while the app has the Accessibility permission. If the permission was removed, allow it again first.
 
 ## License
 
