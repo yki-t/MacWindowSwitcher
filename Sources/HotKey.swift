@@ -9,14 +9,18 @@ private let tabKey: Int64 = 48
 private let escapeKey: Int64 = 53
 private let leftKey: Int64 = 123
 private let rightKey: Int64 = 124
+private let hKey: Int64 = 4
+private let lKey: Int64 = 37
 
 final class HotKey {
     private weak var switcher: Switcher?
+    private weak var spaceMover: SpaceMover?
     private var tap: CFMachPort?
     private var engaged = false
 
-    init?(switcher: Switcher) {
+    init?(switcher: Switcher, spaceMover: SpaceMover) {
         self.switcher = switcher
+        self.spaceMover = spaceMover
 
         let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, refcon in
@@ -85,8 +89,30 @@ final class HotKey {
             return pass
 
         case .keyDown:
+            // The Ctrl+Left / Right arrow events that SpaceMover posts must go
+            // to the system. With the panel open, the arrow keys move the selection.
+            if event.getIntegerValueField(.eventSourceUserData) == spaceMoverEventMarker { return pass }
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
             let flags = event.flags
+            if !engaged, keyCode == hKey || keyCode == lKey,
+               flags.contains(.maskAlternate), !flags.contains(.maskCommand), !flags.contains(.maskControl),
+               let spaceMover {
+                let direction: SpaceDirection = keyCode == hKey ? .left : .right
+                // UserDefaults is thread safe, and a read here sees a change
+                // in the settings window without a restart.
+                if flags.contains(.maskShift) {
+                    guard UserDefaults.standard.bool(forKey: SettingsKey.moveWindowToSpace) else { return pass }
+                    // A move takes up to about 1 s. A key repeat would start
+                    // more moves after the user releases the key.
+                    if event.getIntegerValueField(.keyboardEventAutorepeat) == 0 {
+                        spaceMover.moveWindow(direction)
+                    }
+                } else {
+                    guard UserDefaults.standard.bool(forKey: SettingsKey.switchSpace) else { return pass }
+                    spaceMover.switchSpace(direction)
+                }
+                return nil
+            }
             if keyCode == tabKey && flags.contains(.maskCommand)
                 && !flags.contains(.maskControl) && !flags.contains(.maskAlternate) {
                 engaged = true

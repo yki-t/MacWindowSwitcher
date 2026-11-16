@@ -1,6 +1,5 @@
 import AppKit
 import ApplicationServices
-import ServiceManagement
 
 final class Switcher {
     private let tracker = WindowTracker()
@@ -122,20 +121,22 @@ final class Switcher {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var trustTimer: Timer?
     private var signalSources: [DispatchSourceSignal] = []
     private var switcher: Switcher?
+    private var spaceMover: SpaceMover?
+    private var settingsWindow: SettingsWindow?
     private var hotKey: HotKey?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: nil)
         let menu = NSMenu()
-        let loginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin(_:)), keyEquivalent: "")
-        loginItem.target = self
-        menu.addItem(loginItem)
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(openSettings(_:)), keyEquivalent: "")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
         item.menu = menu
@@ -168,40 +169,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         hotKey?.restoreNativeHotKeys()
     }
 
-    // AppKit validates menu items each time the menu opens. The user can
-    // change the login item in System Settings, so read the status here.
-    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(toggleLaunchAtLogin(_:)) {
-            menuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        }
-        return true
-    }
-
-    @objc private func toggleLaunchAtLogin(_ sender: NSMenuItem) {
-        do {
-            switch SMAppService.mainApp.status {
-            case .enabled:
-                try SMAppService.mainApp.unregister()
-            case .requiresApproval:
-                // The item is registered, but the user must allow it in System
-                // Settings (for example, the user turned it off there). register()
-                // always fails in this status, and only the user can allow it.
-                SMAppService.openSystemSettingsLoginItems()
-            case .notRegistered, .notFound:
-                // The status .notFound does not tell if register() can succeed.
-                // Try it; the alert below shows a failure.
-                try SMAppService.mainApp.register()
-            @unknown default:
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Cannot change Launch at Login"
-            alert.informativeText = error.localizedDescription
-            // An accessory app is not active, so the alert opens behind other windows.
-            NSApp.activate(ignoringOtherApps: true)
-            alert.runModal()
-        }
+    @objc private func openSettings(_ sender: NSMenuItem) {
+        let window = settingsWindow ?? SettingsWindow()
+        settingsWindow = window
+        window.show()
     }
 
     private func start() {
@@ -209,12 +180,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             CGRequestScreenCaptureAccess()
         }
         let switcher = Switcher()
-        guard let hotKey = HotKey(switcher: switcher) else {
+        let spaceMover = SpaceMover()
+        guard let hotKey = HotKey(switcher: switcher, spaceMover: spaceMover) else {
             FileHandle.standardError.write("WindowSwitcher: cannot create the event tap\n".data(using: .utf8)!)
             NSApp.terminate(nil)
             return
         }
         self.switcher = switcher
+        self.spaceMover = spaceMover
         self.hotKey = hotKey
     }
 }

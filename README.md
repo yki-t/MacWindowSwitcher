@@ -18,7 +18,7 @@ Lists the windows on the visible Desktops (minimized windows and windows of hidd
 2. Run `make install`. It builds and signs the app, copies it to `~/Applications/WindowSwitcher.app`, and starts it.
 3. Allow the app in System Settings > Privacy & Security > Accessibility. The app starts to work after that.
 4. Allow the app in System Settings > Privacy & Security > Screen & System Audio Recording, then run `make install` again. Thumbnails need a restart of the app. Without this permission, the app shows app icons in place of thumbnails.
-5. Optional: select `Launch at Login` in the menu bar menu.
+5. Optional: select `Settings...` in the menu bar menu and turn on `Launch at Login`.
 
 ## Keys
 
@@ -30,13 +30,19 @@ Lists the windows on the visible Desktops (minimized windows and windows of hidd
 | Release Cmd | Switch to the selected window. |
 | Esc | Close the panel without a switch. |
 | Click on a tile | Switch to that window. |
+| Option+H / Option+L | Move to the Space on the left / right. |
+| Shift+Option+H / Shift+Option+L | Move the focused window to the Space on the left / right. |
+
+The Option keys are off by default. Turn them on in `Settings...`.
+They need the Mission Control shortcuts (Ctrl+Left / Right arrow) on in System Settings > Keyboard > Keyboard Shortcuts > Mission Control.
 
 ## Limitations
 
-- It uses two private APIs (`CGSSetSymbolicHotKeyEnabled`, `_AXUIElementGetWindow`). A macOS update can stop it.
+- It uses private APIs (`CGSSetSymbolicHotKeyEnabled`, `_AXUIElementGetWindow`, `CGSMainConnectionID`, `CGSGetActiveSpace`, `CGSCopyManagedDisplaySpaces`). A macOS update can stop it.
 - It cannot be sandboxed and cannot be distributed through the Mac App Store.
 - While Secure Input is on (for example, a password field has the focus), Cmd+Tab does nothing.
 - Windows on other Desktops are not listed.
+- Shift+Option+H / L cannot move a full screen window. It can fail for an app that draws its own title bar.
 
 ## Recovery
 

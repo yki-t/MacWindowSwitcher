@@ -141,11 +141,18 @@ final class WindowTracker {
     }
 
     private func bumpFocusedWindow(of app: NSRunningApplication) {
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
-              let value, CFGetTypeID(value) == AXUIElementGetTypeID(),
-              let id = windowID(value as! AXUIElement) else { return }
+        guard let window = focusedWindow(of: app.processIdentifier),
+              let id = windowID(window) else { return }
         bump(id)
     }
+}
+
+// Only AX calls, so it can run on any queue. The messaging timeout that
+// WindowTracker.init sets also applies here.
+func focusedWindow(of pid: pid_t) -> AXUIElement? {
+    let appElement = AXUIElementCreateApplication(pid)
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
+          let value, CFGetTypeID(value) == AXUIElementGetTypeID() else { return nil }
+    return (value as! AXUIElement)
 }
