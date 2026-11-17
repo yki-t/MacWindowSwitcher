@@ -14,7 +14,7 @@ struct WindowInfo {
     let isMinimized: Bool
 }
 
-private func attribute<T>(_ element: AXUIElement, _ name: String) -> T? {
+func attribute<T>(_ element: AXUIElement, _ name: String) -> T? {
     var value: CFTypeRef?
     guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
     return value as? T

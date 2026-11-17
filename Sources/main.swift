@@ -167,6 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         hotKey?.restoreNativeHotKeys()
+        spaceMover?.releaseMouse()
     }
 
     @objc private func openSettings(_ sender: NSMenuItem) {

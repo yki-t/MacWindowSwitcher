@@ -6,14 +6,41 @@ enum SettingsKey {
     static let moveWindowToSpace = "MoveWindowToSpace"
 }
 
-final class SettingsWindow: NSObject {
+private let windowMargin: CGFloat = 20
+private let checkBoxSpacing: CGFloat = 10
+// The key code of ANSI W. A compare of the characters fails with an input
+// source that has no Latin letters.
+private let wKey: UInt16 = 13
+
+// An accessory app has no main menu, so no menu item sends Cmd+W to the window.
+private final class ClosableWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Caps Lock is in deviceIndependentFlagsMask, so only these four flags are compared.
+        // Compare the character first, because Dvorak and AZERTY put W on a
+        // different key. Use the key code only when the input source gives a
+        // character that is not ASCII.
+        let characters = event.charactersIgnoringModifiers?.lowercased() ?? ""
+        let isW = characters.allSatisfy(\.isASCII) ? characters == "w" : event.keyCode == wKey
+        if event.modifierFlags.intersection([.command, .shift, .option, .control]) == .command, isW {
+            performClose(nil)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func cancelOperation(_ sender: Any?) {
+        performClose(nil)
+    }
+}
+
+final class SettingsWindow: NSObject, NSWindowDelegate {
     private let window: NSWindow
     private let loginBox: NSButton
     private let switchSpaceBox: NSButton
     private let moveWindowBox: NSButton
 
     override init() {
-        window = NSWindow(
+        window = ClosableWindow(
             contentRect: .zero,
             styleMask: [.titled, .closable],
             backing: .buffered,
@@ -34,25 +61,28 @@ final class SettingsWindow: NSObject {
         let stack = NSStackView(views: [loginBox, switchSpaceBox, moveWindowBox])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 10
+        stack.spacing = checkBoxSpacing
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         let content = NSView()
         content.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -20),
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            stack.topAnchor.constraint(equalTo: content.topAnchor, constant: windowMargin),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -windowMargin),
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: windowMargin),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -windowMargin),
         ])
 
         window.title = "Settings"
         window.contentView = content
-        // The window is created with a zero content rect. If the window keeps
-        // that size, AppKit gives it a default width that is too narrow for the
-        // longest title, and the stack view compresses that check box.
+        // Auto Layout makes the window larger at the first layout, but center()
+        // uses the size before that layout. Set the size before center().
+        // The window is centered only here, so it keeps the position that the
+        // user gives it while the app runs.
         window.setContentSize(content.fittingSize)
+        window.center()
         window.isReleasedWhenClosed = false
+        window.delegate = self
     }
 
     // The user can change the login item in System Settings, so read the
@@ -61,8 +91,13 @@ final class SettingsWindow: NSObject {
         refresh()
         // An accessory app is not active, so the window opens behind other windows.
         NSApp.activate(ignoringOtherApps: true)
-        if !window.isVisible { window.center() }
         window.makeKeyAndOrderFront(nil)
+    }
+
+    // The user can change the login item in System Settings while this
+    // window is open.
+    func windowDidBecomeKey(_ notification: Notification) {
+        refresh()
     }
 
     private func refresh() {

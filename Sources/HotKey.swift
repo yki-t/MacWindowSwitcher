@@ -17,12 +17,17 @@ final class HotKey {
     private weak var spaceMover: SpaceMover?
     private var tap: CFMachPort?
     private var engaged = false
+    // Key codes of the Option+H / L key downs that the tap stopped. The
+    // frontmost application must not get a key up without its key down.
+    // Read and written only on the tap thread, in handle(_:_:).
+    private var stoppedKeys: Set<Int64> = []
 
     init?(switcher: Switcher, spaceMover: SpaceMover) {
         self.switcher = switcher
         self.spaceMover = spaceMover
 
-        let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
+        let mask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.keyUp.rawValue)
+            | (1 << CGEventType.flagsChanged.rawValue)
         let callback: CGEventTapCallBack = { _, type, event, refcon in
             guard let refcon else { return Unmanaged.passUnretained(event) }
             let hotKey = Unmanaged<HotKey>.fromOpaque(refcon).takeUnretainedValue()
@@ -61,9 +66,10 @@ final class HotKey {
     }
 
     // All keyboard input of the session waits until this function returns.
-    // The Switcher methods only add work to the Switcher queue, so it returns
-    // fast. Switcher state is not read here, because it is changed on the
-    // Switcher queue.
+    // The Switcher methods only add work to the Switcher queue, and the
+    // SpaceMover methods only take a lock and add work to the SpaceMover
+    // queue, so it returns fast. Switcher state is not read here, because it
+    // is changed on the Switcher queue.
     // engaged is read and written only on the tap thread, in this function.
     // It is true from Cmd+Tab until the Cmd release or Esc.
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
@@ -73,6 +79,9 @@ final class HotKey {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+            // A key up that occurs while the tap is disabled does not come
+            // later. A stale key code would stop the key up of a later key press.
+            stoppedKeys.removeAll()
             // The tap does not get the Cmd release if it occurs while the tap
             // is disabled, so the current flags tell if Cmd is still down.
             if engaged && !CGEventSource.flagsState(.combinedSessionState).contains(.maskCommand) {
@@ -94,6 +103,8 @@ final class HotKey {
             if event.getIntegerValueField(.eventSourceUserData) == spaceMoverEventMarker { return pass }
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
             let flags = event.flags
+            // A key down that the tap passes also has a key up that it must pass.
+            stoppedKeys.remove(keyCode)
             if !engaged, keyCode == hKey || keyCode == lKey,
                flags.contains(.maskAlternate), !flags.contains(.maskCommand), !flags.contains(.maskControl),
                let spaceMover {
@@ -111,6 +122,7 @@ final class HotKey {
                     guard UserDefaults.standard.bool(forKey: SettingsKey.switchSpace) else { return pass }
                     spaceMover.switchSpace(direction)
                 }
+                stoppedKeys.insert(keyCode)
                 return nil
             }
             if keyCode == tabKey && flags.contains(.maskCommand)
@@ -131,6 +143,13 @@ final class HotKey {
             // Cmd is down while engaged. Other keys would go to the frontmost
             // application as shortcuts such as Cmd+W.
             return nil
+
+        case .keyUp:
+            if event.getIntegerValueField(.eventSourceUserData) == spaceMoverEventMarker { return pass }
+            // The key up has no Option flag when the user releases Option
+            // first, so only the key code is compared.
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            return stoppedKeys.remove(keyCode) != nil ? nil : pass
 
         default:
             return pass

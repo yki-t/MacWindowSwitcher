@@ -34,6 +34,7 @@ Lists the windows on the visible Desktops (minimized windows and windows of hidd
 | Shift+Option+H / Shift+Option+L | Move the focused window to the Space on the left / right. |
 
 The Option keys are off by default. Turn them on in `Settings...`.
+Option+H / L use the physical H and L key positions of the ANSI layout (key codes 4 and 37).
 They need the Mission Control shortcuts (Ctrl+Left / Right arrow) on in System Settings > Keyboard > Keyboard Shortcuts > Mission Control.
 
 ## Limitations
@@ -42,7 +43,7 @@ They need the Mission Control shortcuts (Ctrl+Left / Right arrow) on in System S
 - It cannot be sandboxed and cannot be distributed through the Mac App Store.
 - While Secure Input is on (for example, a password field has the focus), Cmd+Tab does nothing.
 - Windows on other Desktops are not listed.
-- Shift+Option+H / L cannot move a full screen window. It can fail for an app that draws its own title bar.
+- Shift+Option+H / L cannot move a full screen window, and does nothing when the next Space is a full screen app. It can fail for an app that draws its own title bar.
 
 ## Recovery
 
