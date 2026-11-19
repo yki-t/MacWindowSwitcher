@@ -113,7 +113,8 @@ final class SwitcherPanel {
         tiles.removeAll()
         order = windows.map(\.id)
 
-        let screen = NSScreen.main ?? NSScreen.screens[0]
+        let screen = UserDefaults.standard.string(forKey: SettingsKey.switcherDisplay).flatMap(connectedScreen(uuid:))
+            ?? NSScreen.main ?? NSScreen.screens[0]
         let available = CGSize(
             width: screen.visibleFrame.width * 0.9 - panelMargin * 2,
             height: screen.visibleFrame.height * 0.9 - panelMargin * 2

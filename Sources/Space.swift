@@ -256,8 +256,7 @@ final class SpaceMover {
     private func matches(_ entry: [String: Any], _ display: CGDirectDisplayID) -> Bool {
         guard let identifier = entry["Display Identifier"] as? String else { return false }
         if identifier == "Main" { return CGDisplayIsMain(display) != 0 }
-        guard let uuid = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue(),
-              let text = CFUUIDCreateString(nil, uuid) as String? else { return false }
+        guard let text = displayUUID(display) else { return false }
         return identifier.caseInsensitiveCompare(text) == .orderedSame
     }
 

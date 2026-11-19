@@ -34,6 +34,7 @@ Lists the windows on the visible Desktops (minimized windows and windows of hidd
 | Shift+Option+H / Shift+Option+L | Move the focused window to the Space on the left / right. |
 
 The Option keys are off by default. Turn them on in `Settings...`.
+In `Settings...`, select the display where the panel opens. By default, the panel opens on the display with the active window.
 Option+H / L use the physical H and L key positions of the ANSI layout (key codes 4 and 37).
 They need the Mission Control shortcuts (Ctrl+Left / Right arrow) on in System Settings > Keyboard > Keyboard Shortcuts > Mission Control.
 
