@@ -1,6 +1,24 @@
 import AppKit
 import ApplicationServices
 
+// Public API, but deprecated. The SDK marks it unavailable in Swift, and
+// _SLPSSetFrontProcessWithOptions and SLPSPostEventRecordTo need a PSN.
+@_silgen_name("GetProcessForPID")
+private func GetProcessForPID(_ pid: pid_t, _ psn: inout ProcessSerialNumber) -> OSStatus
+
+// Private API. Activation of the app brings all of its windows to the front.
+// With a window ID, this call brings only that window to the front.
+@_silgen_name("_SLPSSetFrontProcessWithOptions")
+private func _SLPSSetFrontProcessWithOptions(_ psn: inout ProcessSerialNumber, _ wid: CGWindowID, _ mode: UInt32) -> CGError
+
+// Private API. Without the activation of the app, the window does not become
+// key. yabai sends this event record to make the window key.
+@_silgen_name("SLPSPostEventRecordTo")
+private func SLPSPostEventRecordTo(_ psn: inout ProcessSerialNumber, _ bytes: UnsafeMutablePointer<UInt8>) -> CGError
+
+// Mode value that marks the change of the front process as user generated.
+private let userGeneratedMode: UInt32 = 0x200
+
 final class Switcher {
     private let tracker = WindowTracker()
     private let thumbnailer = Thumbnailer()
@@ -113,11 +131,26 @@ final class Switcher {
         if window.isMinimized {
             AXUIElementSetAttributeValue(window.element, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
         }
-        AXUIElementPerformAction(window.element, kAXRaiseAction as CFString)
         AXUIElementSetAttributeValue(window.element, kAXMainAttribute as CFString, kCFBooleanTrue)
-        let appElement = AXUIElementCreateApplication(window.app.processIdentifier)
-        AXUIElementSetAttributeValue(appElement, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
-        window.app.activate(options: [])
+        var psn = ProcessSerialNumber()
+        guard GetProcessForPID(window.app.processIdentifier, &psn) == noErr else { return }
+        _ = _SLPSSetFrontProcessWithOptions(&psn, window.id, userGeneratedMode)
+        makeKeyWindow(&psn, window.id)
+        AXUIElementPerformAction(window.element, kAXRaiseAction as CFString)
+    }
+
+    // The record layout comes from yabai (window_manager_make_key_window).
+    // The fields are not documented.
+    private func makeKeyWindow(_ psn: inout ProcessSerialNumber, _ id: CGWindowID) {
+        var bytes = [UInt8](repeating: 0, count: 0xf8)
+        bytes[0x04] = 0xf8
+        bytes[0x3a] = 0x10
+        withUnsafeBytes(of: id) { bytes.replaceSubrange(0x3c..<0x3c + $0.count, with: $0) }
+        bytes.replaceSubrange(0x20..<0x30, with: repeatElement(0xff, count: 0x10))
+        for type: UInt8 in [0x01, 0x02] {
+            bytes[0x08] = type
+            _ = SLPSPostEventRecordTo(&psn, &bytes)
+        }
     }
 }
 
